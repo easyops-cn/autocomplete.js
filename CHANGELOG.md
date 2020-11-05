@@ -1,3 +1,13 @@
+<a name="0.38.1"></a>
+## [0.38.1](https://github.com/easyops-cn/autocomplete.js/compare/v0.38.0...v0.38.1) (2020-11-05)
+
+
+### Bug Fixes
+
+* **utils:** escape css selectors ([36c6db6](https://github.com/easyops-cn/autocomplete.js/commit/36c6db6))
+
+
+
 <a name="0.38.0"></a>
 # [0.38.0](https://github.com/algolia/autocomplete.js/compare/v0.37.1...v0.38.0) (2020-09-17)
 

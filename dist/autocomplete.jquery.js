@@ -1,5 +1,5 @@
 /*!
- * autocomplete.js 0.38.0
+ * autocomplete.js 0.38.1
  * https://github.com/algolia/autocomplete.js
  * Copyright 2020 Algolia, Inc. and other contributors; Licensed MIT
  */
@@ -82,8 +82,8 @@
 	_.mixin = $.extend;
 	_.Event = $.Event;
 
-	var Typeahead = __webpack_require__(5);
-	var EventBus = __webpack_require__(6);
+	var Typeahead = __webpack_require__(6);
+	var EventBus = __webpack_require__(7);
 
 	var old;
 	var typeaheadKey;
@@ -246,6 +246,7 @@
 
 	'use strict';
 
+	var cssesc = __webpack_require__(5);
 	var DOM = __webpack_require__(2);
 
 	function escapeRegExp(str) {
@@ -356,7 +357,9 @@
 	  },
 
 	  className: function(prefix, clazz, skipDot) {
-	    return (skipDot ? '' : '.') + prefix + clazz;
+	    // When `skipDot` is false or omitted,
+	    // it should return a css selector which should do `CSS.escape()`.
+	    return (skipDot ? prefix + clazz : '.' + cssesc(prefix + clazz, {isIdentifier: true}));
 	  },
 
 	  escapeHighlightedString: function(str, highlightPreTag, highlightPostTag) {
@@ -379,6 +382,122 @@
 
 /***/ },
 /* 5 */
+/***/ function(module, exports) {
+
+	/*! https://mths.be/cssesc v3.0.0 by @mathias */
+	'use strict';
+
+	var object = {};
+	var hasOwnProperty = object.hasOwnProperty;
+	var merge = function merge(options, defaults) {
+		if (!options) {
+			return defaults;
+		}
+		var result = {};
+		for (var key in defaults) {
+			// `if (defaults.hasOwnProperty(key) { … }` is not needed here, since
+			// only recognized option names are used.
+			result[key] = hasOwnProperty.call(options, key) ? options[key] : defaults[key];
+		}
+		return result;
+	};
+
+	var regexAnySingleEscape = /[ -,\.\/:-@\[-\^`\{-~]/;
+	var regexSingleEscape = /[ -,\.\/:-@\[\]\^`\{-~]/;
+	var regexAlwaysEscape = /['"\\]/;
+	var regexExcessiveSpaces = /(^|\\+)?(\\[A-F0-9]{1,6})\x20(?![a-fA-F0-9\x20])/g;
+
+	// https://mathiasbynens.be/notes/css-escapes#css
+	var cssesc = function cssesc(string, options) {
+		options = merge(options, cssesc.options);
+		if (options.quotes != 'single' && options.quotes != 'double') {
+			options.quotes = 'single';
+		}
+		var quote = options.quotes == 'double' ? '"' : '\'';
+		var isIdentifier = options.isIdentifier;
+
+		var firstChar = string.charAt(0);
+		var output = '';
+		var counter = 0;
+		var length = string.length;
+		while (counter < length) {
+			var character = string.charAt(counter++);
+			var codePoint = character.charCodeAt();
+			var value = void 0;
+			// If it’s not a printable ASCII character…
+			if (codePoint < 0x20 || codePoint > 0x7E) {
+				if (codePoint >= 0xD800 && codePoint <= 0xDBFF && counter < length) {
+					// It’s a high surrogate, and there is a next character.
+					var extra = string.charCodeAt(counter++);
+					if ((extra & 0xFC00) == 0xDC00) {
+						// next character is low surrogate
+						codePoint = ((codePoint & 0x3FF) << 10) + (extra & 0x3FF) + 0x10000;
+					} else {
+						// It’s an unmatched surrogate; only append this code unit, in case
+						// the next code unit is the high surrogate of a surrogate pair.
+						counter--;
+					}
+				}
+				value = '\\' + codePoint.toString(16).toUpperCase() + ' ';
+			} else {
+				if (options.escapeEverything) {
+					if (regexAnySingleEscape.test(character)) {
+						value = '\\' + character;
+					} else {
+						value = '\\' + codePoint.toString(16).toUpperCase() + ' ';
+					}
+				} else if (/[\t\n\f\r\x0B]/.test(character)) {
+					value = '\\' + codePoint.toString(16).toUpperCase() + ' ';
+				} else if (character == '\\' || !isIdentifier && (character == '"' && quote == character || character == '\'' && quote == character) || isIdentifier && regexSingleEscape.test(character)) {
+					value = '\\' + character;
+				} else {
+					value = character;
+				}
+			}
+			output += value;
+		}
+
+		if (isIdentifier) {
+			if (/^-[-\d]/.test(output)) {
+				output = '\\-' + output.slice(1);
+			} else if (/\d/.test(firstChar)) {
+				output = '\\3' + firstChar + ' ' + output.slice(1);
+			}
+		}
+
+		// Remove spaces after `\HEX` escapes that are not followed by a hex digit,
+		// since they’re redundant. Note that this is only possible if the escape
+		// sequence isn’t preceded by an odd number of backslashes.
+		output = output.replace(regexExcessiveSpaces, function ($0, $1, $2) {
+			if ($1 && $1.length % 2) {
+				// It’s not safe to remove the space, so don’t.
+				return $0;
+			}
+			// Strip the space.
+			return ($1 || '') + $2;
+		});
+
+		if (!isIdentifier && options.wrap) {
+			return quote + output + quote;
+		}
+		return output;
+	};
+
+	// Expose default options (so they can be overridden globally).
+	cssesc.options = {
+		'escapeEverything': false,
+		'isIdentifier': false,
+		'quotes': 'single',
+		'wrap': false
+	};
+
+	cssesc.version = '3.0.0';
+
+	module.exports = cssesc;
+
+
+/***/ },
+/* 6 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -387,11 +506,11 @@
 
 	var _ = __webpack_require__(4);
 	var DOM = __webpack_require__(2);
-	var EventBus = __webpack_require__(6);
-	var Input = __webpack_require__(7);
-	var Dropdown = __webpack_require__(16);
-	var html = __webpack_require__(18);
-	var css = __webpack_require__(19);
+	var EventBus = __webpack_require__(7);
+	var Input = __webpack_require__(8);
+	var Dropdown = __webpack_require__(17);
+	var html = __webpack_require__(19);
+	var css = __webpack_require__(20);
 
 	// constructor
 	// -----------
@@ -1032,13 +1151,13 @@
 
 	Typeahead.Dropdown = Dropdown;
 	Typeahead.Input = Input;
-	Typeahead.sources = __webpack_require__(20);
+	Typeahead.sources = __webpack_require__(21);
 
 	module.exports = Typeahead;
 
 
 /***/ },
-/* 6 */
+/* 7 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -1077,7 +1196,7 @@
 
 
 /***/ },
-/* 7 */
+/* 8 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -1096,7 +1215,7 @@
 
 	var _ = __webpack_require__(4);
 	var DOM = __webpack_require__(2);
-	var EventEmitter = __webpack_require__(8);
+	var EventEmitter = __webpack_require__(9);
 
 	// constructor
 	// -----------
@@ -1424,12 +1543,12 @@
 
 
 /***/ },
-/* 8 */
+/* 9 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
-	var immediate = __webpack_require__(9);
+	var immediate = __webpack_require__(10);
 	var splitter = /\s+/;
 
 	module.exports = {
@@ -1532,16 +1651,16 @@
 
 
 /***/ },
-/* 9 */
+/* 10 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 	var types = [
-	  __webpack_require__(10),
-	  __webpack_require__(12),
+	  __webpack_require__(11),
 	  __webpack_require__(13),
 	  __webpack_require__(14),
-	  __webpack_require__(15)
+	  __webpack_require__(15),
+	  __webpack_require__(16)
 	];
 	var draining;
 	var currentQueue;
@@ -1634,7 +1753,7 @@
 
 
 /***/ },
-/* 10 */
+/* 11 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* WEBPACK VAR INJECTION */(function(process) {'use strict';
@@ -1649,10 +1768,10 @@
 	  };
 	};
 
-	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(11)))
+	/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(12)))
 
 /***/ },
-/* 11 */
+/* 12 */
 /***/ function(module, exports) {
 
 	// shim for using process in browser
@@ -1838,7 +1957,7 @@
 
 
 /***/ },
-/* 12 */
+/* 13 */
 /***/ function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {'use strict';
@@ -1866,7 +1985,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 13 */
+/* 14 */
 /***/ function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {'use strict';
@@ -1890,7 +2009,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 14 */
+/* 15 */
 /***/ function(module, exports) {
 
 	/* WEBPACK VAR INJECTION */(function(global) {'use strict';
@@ -1920,7 +2039,7 @@
 	/* WEBPACK VAR INJECTION */}.call(exports, (function() { return this; }())))
 
 /***/ },
-/* 15 */
+/* 16 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -1935,16 +2054,16 @@
 	};
 
 /***/ },
-/* 16 */
+/* 17 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
 	var _ = __webpack_require__(4);
 	var DOM = __webpack_require__(2);
-	var EventEmitter = __webpack_require__(8);
-	var Dataset = __webpack_require__(17);
-	var css = __webpack_require__(19);
+	var EventEmitter = __webpack_require__(9);
+	var Dataset = __webpack_require__(18);
+	var css = __webpack_require__(20);
 
 	// constructor
 	// -----------
@@ -2335,7 +2454,7 @@
 
 
 /***/ },
-/* 17 */
+/* 18 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -2346,9 +2465,9 @@
 
 	var _ = __webpack_require__(4);
 	var DOM = __webpack_require__(2);
-	var html = __webpack_require__(18);
-	var css = __webpack_require__(19);
-	var EventEmitter = __webpack_require__(8);
+	var html = __webpack_require__(19);
+	var css = __webpack_require__(20);
+	var EventEmitter = __webpack_require__(9);
 
 	// constructor
 	// -----------
@@ -2648,7 +2767,7 @@
 
 
 /***/ },
-/* 18 */
+/* 19 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -2663,7 +2782,7 @@
 
 
 /***/ },
-/* 19 */
+/* 20 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
@@ -2766,26 +2885,26 @@
 
 
 /***/ },
-/* 20 */
-/***/ function(module, exports, __webpack_require__) {
-
-	'use strict';
-
-	module.exports = {
-	  hits: __webpack_require__(21),
-	  popularIn: __webpack_require__(24)
-	};
-
-
-/***/ },
 /* 21 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
+	module.exports = {
+	  hits: __webpack_require__(22),
+	  popularIn: __webpack_require__(25)
+	};
+
+
+/***/ },
+/* 22 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
 	var _ = __webpack_require__(4);
-	var version = __webpack_require__(22);
-	var parseAlgoliaClientVersion = __webpack_require__(23);
+	var version = __webpack_require__(23);
+	var parseAlgoliaClientVersion = __webpack_require__(24);
 
 	function createMultiQuerySource() {
 	  var queries = [];
@@ -2855,14 +2974,14 @@
 
 
 /***/ },
-/* 22 */
+/* 23 */
 /***/ function(module, exports) {
 
-	module.exports = "0.38.0";
+	module.exports = "0.38.1";
 
 
 /***/ },
-/* 23 */
+/* 24 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -2883,14 +3002,14 @@
 
 
 /***/ },
-/* 24 */
+/* 25 */
 /***/ function(module, exports, __webpack_require__) {
 
 	'use strict';
 
 	var _ = __webpack_require__(4);
-	var version = __webpack_require__(22);
-	var parseAlgoliaClientVersion = __webpack_require__(23);
+	var version = __webpack_require__(23);
+	var parseAlgoliaClientVersion = __webpack_require__(24);
 
 	module.exports = function popularIn(index, params, details, options) {
 	  var algoliaVersion = parseAlgoliaClientVersion(index.as._ua);
