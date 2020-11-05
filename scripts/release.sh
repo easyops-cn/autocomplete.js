@@ -22,10 +22,10 @@ fi
 semver $nextVersion -r ">$currentVersion" ||
 error_exit "Cannot bump from $currentVersion to $nextVersion"
 
-if ! npm owner ls | grep -q "$(npm whoami)"
-then
-  error_exit "Not an owner of the npm repo, ask for it"
-fi
+# if ! npm owner ls | grep -q "$(npm whoami)"
+# then
+#   error_exit "Not an owner of the npm repo, ask for it"
+# fi
 
 currentBranch=$(git rev-parse --abbrev-ref HEAD)
 if [[ $currentBranch != 'master' ]]; then
@@ -48,4 +48,4 @@ git commit -m $nextVersion &&
 git tag v$nextVersion &&
 git push &&
 git push --tags &&
-npm publish || error_exit "Something went wrong, check log, be careful and start over"
+npm publish --access public || error_exit "Something went wrong, check log, be careful and start over"
